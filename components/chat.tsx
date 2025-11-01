@@ -1,19 +1,20 @@
 "use client";
 
-import { useRef, useEffect, useState, FormEvent } from "react";
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-}
+import { useChat } from "@ai-sdk/react";
+import { useRef, useEffect, useState } from "react";
+import type { UIMessage } from "@ai-sdk/react";
 
 export function Chat() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { messages, sendMessage, status } = useChat();
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isLoading = status === "streaming";
+
+  console.log("🔷 Chat component state:", {
+    messageCount: messages.length,
+    status,
+    isLoading,
+  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -22,75 +23,6 @@ export function Chat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: input,
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [...messages, userMessage].map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (!reader) {
-        throw new Error("No response body");
-      }
-
-      let assistantMessage = "";
-      const assistantId = Date.now().toString();
-
-      // Add empty assistant message that we'll update
-      setMessages((prev) => [
-        ...prev,
-        { id: assistantId, role: "assistant", content: "" },
-      ]);
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        assistantMessage += chunk;
-
-        // Update the assistant message in real-time
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId ? { ...m, content: assistantMessage } : m
-          )
-        );
-      }
-    } catch (err) {
-      console.error("Chat error:", err);
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const suggestions = [
     "Summarize my unread emails",
@@ -111,12 +43,6 @@ export function Chat() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto mb-4 space-y-4">
-        {error && (
-          <div className="bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-200 px-4 py-3 rounded">
-            <p className="font-bold">Error</p>
-            <p>{error}</p>
-          </div>
-        )}
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full space-y-4">
             <p className="text-gray-500 dark:text-gray-400 text-center">
@@ -128,6 +54,7 @@ export function Chat() {
                   key={index}
                   onClick={() => {
                     setInput(suggestion);
+                    sendMessage({ text: suggestion });
                   }}
                   className="p-3 text-left text-sm border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
@@ -137,7 +64,7 @@ export function Chat() {
             </div>
           </div>
         ) : (
-          messages.map((message: any) => (
+          messages.map((message: UIMessage) => (
             <div
               key={message.id}
               className={`flex ${
@@ -151,8 +78,11 @@ export function Chat() {
                     : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 }`}
               >
-                <div className="whitespace-pre-wrap break-words">
-                  {message.content}
+                <div className="whitespace-pre-wrap wrap-break-word">
+                  {message.parts
+                    .filter((part) => part.type === "text")
+                    .map((part: any) => part.text)
+                    .join("")}
                 </div>
               </div>
             </div>
@@ -163,8 +93,8 @@ export function Chat() {
             <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
               <div className="flex space-x-2">
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.1s]"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
               </div>
             </div>
           </div>
@@ -173,7 +103,16 @@ export function Chat() {
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSubmit} className="flex gap-2">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (input.trim() && !isLoading) {
+            sendMessage({ text: input });
+            setInput("");
+          }
+        }}
+        className="flex gap-2"
+      >
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -184,7 +123,7 @@ export function Chat() {
         <button
           type="submit"
           disabled={isLoading || !input.trim()}
-          className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Send
         </button>
