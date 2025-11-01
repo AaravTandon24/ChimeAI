@@ -1,12 +1,18 @@
 "use client";
 
-import { useChat } from "@ai-sdk/react";
 import { useRef, useEffect, useState, FormEvent } from "react";
 
-export function Chat() {
-  const { messages, sendMessage, status } = useChat();
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+}
 
+export function Chat() {
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -17,14 +23,74 @@ export function Chat() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
-    sendMessage({ text: input });
-    setInput("");
-  };
+    if (!input.trim() || isLoading) return;
 
-  const isLoading = status === "streaming";
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: input,
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [...messages, userMessage].map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("No response body");
+      }
+
+      let assistantMessage = "";
+      const assistantId = Date.now().toString();
+
+      // Add empty assistant message that we'll update
+      setMessages((prev) => [
+        ...prev,
+        { id: assistantId, role: "assistant", content: "" },
+      ]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        assistantMessage += chunk;
+
+        // Update the assistant message in real-time
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, content: assistantMessage } : m
+          )
+        );
+      }
+    } catch (err) {
+      console.error("Chat error:", err);
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const suggestions = [
     "Summarize my unread emails",
@@ -45,6 +111,12 @@ export function Chat() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto mb-4 space-y-4">
+        {error && (
+          <div className="bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-200 px-4 py-3 rounded">
+            <p className="font-bold">Error</p>
+            <p>{error}</p>
+          </div>
+        )}
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full space-y-4">
             <p className="text-gray-500 dark:text-gray-400 text-center">
@@ -54,7 +126,9 @@ export function Chat() {
               {suggestions.map((suggestion, index) => (
                 <button
                   key={index}
-                  onClick={() => setInput(suggestion)}
+                  onClick={() => {
+                    setInput(suggestion);
+                  }}
                   className="p-3 text-left text-sm border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   {suggestion}
@@ -78,21 +152,8 @@ export function Chat() {
                 }`}
               >
                 <div className="whitespace-pre-wrap break-words">
-                  {typeof message.content === "string"
-                    ? message.content
-                    : message.parts?.map((part: any) => part.text).join("")}
+                  {message.content}
                 </div>
-                {message.toolInvocations &&
-                  message.toolInvocations.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-gray-300 dark:border-gray-600">
-                      <p className="text-xs opacity-75">
-                        🔧 Using tools:{" "}
-                        {message.toolInvocations
-                          .map((t: any) => t.toolName)
-                          .join(", ")}
-                      </p>
-                    </div>
-                  )}
               </div>
             </div>
           ))
@@ -123,7 +184,7 @@ export function Chat() {
         <button
           type="submit"
           disabled={isLoading || !input.trim()}
-          className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Send
         </button>
