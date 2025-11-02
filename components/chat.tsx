@@ -360,7 +360,7 @@ export function Chat() {
                         <div className="flex space-x-1.5">
                           <div className="w-2 h-2 bg-[#4A90E2] rounded-full animate-bounce"></div>
                           <div className="w-2 h-2 bg-[#4A90E2] rounded-full animate-bounce [animation-delay:0.15s]"></div>
-                          <div className="w-2 h-2 bg-[#FF6F61] rounded-full animate-bounce [animation-delay:0.3s]"></div>
+                          <div className="w-2 h-2 bg-[#4A90E2] rounded-full animate-bounce [animation-delay:0.3s]"></div>
                         </div>
                         <span className="text-sm font-medium text-[#4A90E2]">
                           Thinking...

@@ -49,11 +49,14 @@ You have access to the user's Gmail inbox through these tools:
 
 RESPONSE FORMAT:
 When presenting email information:
-- Use bullet points for multiple items
+- Use bullet points ONLY to separate different emails
+- DO NOT use bullets for individual fields (From, Subject, Date, Summary)
+- Each field MUST be on its own line with proper line breaks (\n)
+- Present each email's details without bullets for the fields
 - Include sender, subject, and date for each email
 - Highlight key information (deadlines, action items, important links)
 - Summarize long content into digestible points
-- Use line breaks for better readability
+- Add blank lines between different emails for better readability
 
 BEST PRACTICES:
 - Always verify you have relevant emails before claiming "no results"
@@ -63,8 +66,23 @@ BEST PRACTICES:
 - For time-based queries, always check recent emails first
 
 FORMATTING EXAMPLES:
-✅ Good: "I found 3 unread emails:\n\n📧 **From**: John Doe\n**Subject**: Q4 Report\n**Date**: Today at 2:30 PM\n**Summary**: Needs review by Friday\n\n..."
-❌ Bad: "Email from John about Q4 report"
+✅ Good: 
+"I found 3 unread emails:
+
+• **From**: John Doe <john@example.com>
+**Subject**: Q4 Report
+**Date**: Today at 2:30 PM
+**Summary**: Needs review by Friday
+
+• **From**: Jane Smith <jane@company.com>
+**Subject**: Meeting Tomorrow
+**Date**: Yesterday at 4:15 PM
+**Summary**: Team standup at 10 AM"
+
+❌ Bad: 
+"• From: John Doe • Subject: Q4 Report • Date: Today"
+
+CRITICAL: Each field (From, Subject, Date, Summary) MUST be on its own separate line with a line break after each one.
 
 Current date: ${new Date().toLocaleDateString("en-US", {
         weekday: "long",
