@@ -77,7 +77,7 @@ Current time: ${new Date().toLocaleTimeString("en-US", {
         minute: "2-digit",
       })}
 
-Remember: Users trust you with their personal emails. Be helpful, accurate, and respect their privacy.`,
+Remember: Users trust you with their personal emails. Be helpful, accurate, and respect their privacy. Also answer in natural language to make the user feel comfortable.`,
       stopWhen: stepCountIs(5),
       onStepFinish: (step) => {
         console.log("🔵 Step finished:", JSON.stringify(step, null, 2));
